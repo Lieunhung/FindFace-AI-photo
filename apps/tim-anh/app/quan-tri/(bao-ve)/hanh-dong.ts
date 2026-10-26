@@ -18,7 +18,7 @@ import {
   xoaSuKienAnh,
   xoaThuMuc,
 } from "@anh/db";
-import { coPhienQuanTri, emailPhienQuanTri, xoaPhienQuanTri } from "@/lib/quan-tri-auth";
+import { emailPhienQuanTri, laAdminPhien, xoaPhienQuanTri } from "@/lib/quan-tri-auth";
 import {
   ghiNhatKy,
   gomCumKhuonMat,
@@ -26,10 +26,15 @@ import {
   xoaTaiKhoanQuanTri,
 } from "@anh/db";
 
-/** Mọi action đều tự kiểm phiên — action là endpoint công khai, không dựa mỗi layout. */
+/**
+ * Mọi action đều tự kiểm phiên VÀ vai trò — action là endpoint công khai, không dựa mỗi layout.
+ * Tất cả action trong file này là thao tác ghi/xóa nên chỉ Admin được làm; Nhân sự chỉ xem,
+ * in QR, gửi link (các trang riêng, không đi qua file này).
+ */
 async function batBuocPhien(): Promise<string> {
   const email = await emailPhienQuanTri();
   if (!email) redirect("/quan-tri/dang-nhap");
+  if (!(await laAdminPhien())) redirect("/quan-tri?loi=KHONG_DU_QUYEN");
   return email;
 }
 

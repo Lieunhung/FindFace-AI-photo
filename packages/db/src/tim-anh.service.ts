@@ -10,9 +10,10 @@ import { randomBytes } from "node:crypto";
 
 /**
  * Tìm ảnh khuôn mặt (app tim-anh) — service layer.
- * Vector 512 chiều (ArcFace, chuẩn hóa L2) lưu cột pgvector `KhuonMat.embedding` —
+ * Vector 512 chiều (ArcFace, chuẩn hóa L2) lưu cột float8[] `KhuonMat.embedding` —
  * Prisma client không đọc/ghi được kiểu Unsupported nên mọi thao tác vector đi qua
  * $queryRaw có kiểm tra đầu vào chặt (chỉ số hữu hạn, đúng 512 chiều).
+ * Cosine similarity = dot product (vì vector đã chuẩn hóa L2).
  */
 
 /** Một khuôn mặt do dịch vụ model (apps/dich-vu-khuon-mat) trả về khi chỉ mục một ảnh. */
@@ -23,17 +24,15 @@ export interface MatChiMuc {
 }
 
 const SO_CHIEU = 512;
-// HNSW mặc định ef_search=40 — phải nâng ≥ LIMIT để mỗi câu tìm trả đủ ứng viên
 const GIOI_HAN_MOI_VECTOR = 200;
-const EF_SEARCH = 240;
 
-/** Đổi mảng số thành chuỗi pgvector '[a,b,…]' — chặn NaN/Infinity/kiểu lạ lọt vào SQL. */
-function vectorText(v: number[]): string {
+/** Đổi mảng số thành chuỗi PostgreSQL array literal '{a,b,…}' — chặn NaN/Infinity/kiểu lạ lọt vào SQL. */
+function arrayText(v: number[]): string {
   if (!Array.isArray(v) || v.length !== SO_CHIEU) throw new Error("VECTOR_PHAI_512_CHIEU");
   for (const x of v) {
     if (typeof x !== "number" || !Number.isFinite(x)) throw new Error("VECTOR_GIA_TRI_KHONG_HOP_LE");
   }
-  return `[${v.join(",")}]`;
+  return `{${v.join(",")}}`;
 }
 
 // ---- Sự kiện ----
@@ -302,10 +301,10 @@ export async function luuKetQuaChiMuc(
     for (const mat of kq.mats) {
       await tx.$executeRaw`
         INSERT INTO "KhuonMat" ("anhId", "suKienId", "bbox", "diemPhatHien", "embedding")
-        VALUES (${anhId}, ${anh.suKienId}, ${JSON.stringify(mat.bbox)}::jsonb, ${mat.diem}, ${vectorText(mat.vector)}::vector)`;
+        VALUES (${anhId}, ${anh.suKienId}, ${JSON.stringify(mat.bbox)}::jsonb, ${mat.diem}, ${arrayText(mat.vector)}::float8[])`;
     }
     if (kq.clip) {
-      await tx.$executeRaw`UPDATE "AnhSuKien" SET "clipEmb" = ${vectorText(kq.clip)}::vector WHERE "id" = ${anhId}`;
+      await tx.$executeRaw`UPDATE "AnhSuKien" SET "clipEmb" = ${arrayText(kq.clip)}::float8[] WHERE "id" = ${anhId}`;
     }
     return tx.anhSuKien.update({
       where: { id: anhId },
@@ -335,12 +334,14 @@ export async function timAnhTheoMoTa(
   // CLIP ảnh-vs-chữ: cosine thường 0.2–0.35 với cặp khớp — thấp hơn hẳn thang mặt-vs-mặt
   const nguong = tuyChon.nguong ?? 0.23;
   const gioiHan = tuyChon.gioiHan ?? 100;
-  const vt = vectorText(clipVanBan);
+  const vt = arrayText(clipVanBan);
+  // Cosine similarity = dot product (vector đã chuẩn hóa L2); dùng unnest() thay <=> (không có pgvector)
   const rows = await prisma.$queryRaw<{ id: number; tenTep: string; rongPx: number | null; caoPx: number | null; diem: number }[]>`
-    SELECT "id", "tenTep", "rongPx", "caoPx", (1 - ("clipEmb" <=> ${vt}::vector))::float AS "diem"
-    FROM "AnhSuKien"
-    WHERE "suKienId" = ${suKienId} AND "clipEmb" IS NOT NULL AND "trangThai" = 'xong'
-    ORDER BY "clipEmb" <=> ${vt}::vector
+    SELECT anh."id", anh."tenTep", anh."rongPx", anh."caoPx",
+      (SELECT SUM(a * b) FROM unnest(anh."clipEmb", ${vt}::float8[]) t(a, b))::float AS "diem"
+    FROM "AnhSuKien" anh
+    WHERE anh."suKienId" = ${suKienId} AND anh."clipEmb" IS NOT NULL AND anh."trangThai" = 'xong'
+    ORDER BY "diem" DESC
     LIMIT ${gioiHan}`;
   return rows.filter((r) => r.diem >= nguong);
 }
@@ -363,7 +364,9 @@ export interface AnhTimThay extends KetQuaKhop {
 
 /**
  * Tìm ảnh theo 1..n vector selfie trong MỘT sự kiện: mỗi vector chạy một câu KNN
- * trên chỉ mục HNSW, lọc theo ngưỡng cosine, rồi gộp (mỗi ảnh giữ điểm cao nhất).
+ * bằng dot product (cosine với vector L2-normalized), lọc theo ngưỡng, rồi gộp kết quả
+ * (mỗi ảnh giữ điểm cao nhất).
+ * Không dùng pgvector/HNSW — tìm tuần tự trên cột float8[].
  */
 export async function timAnhTheoVector(
   prisma: PrismaClient,
@@ -375,29 +378,23 @@ export async function timAnhTheoVector(
   const gioiHan = tuyChon.gioiHan ?? 500;
   if (vectors.length === 0) return [];
 
-  const cacLan = await prisma.$transaction(async (tx) => {
-    // SET LOCAL chỉ sống trong transaction — không rò cấu hình sang kết nối dùng chung.
-    // SET không nhận bind param → nội suy chuỗi, an toàn vì EF_SEARCH là hằng số của module.
-    // iterative_scan (pgvector ≥0.8): quét tiếp khi lọc suKienId loại bớt ứng viên, khỏi hụt kết quả.
-    await tx.$executeRawUnsafe(`SET LOCAL hnsw.ef_search = ${EF_SEARCH}`);
-    await tx.$executeRawUnsafe(`SET LOCAL hnsw.iterative_scan = 'relaxed_order'`);
-    const kq: KetQuaKhop[][] = [];
-    for (const v of vectors) {
-      const vt = vectorText(v);
-      const rows = await tx.$queryRaw<{ anhId: number; diem: number }[]>`
-        SELECT "anhId", 1 - ("embedding" <=> ${vt}::vector) AS "diem"
-        FROM "KhuonMat"
-        WHERE "suKienId" = ${suKienId} AND "embedding" IS NOT NULL
-        ORDER BY "embedding" <=> ${vt}::vector
-        LIMIT ${GIOI_HAN_MOI_VECTOR}`;
-      kq.push(
-        rows
-          .map((r) => ({ anhId: r.anhId, diem: Number(r.diem) }))
-          .filter((r) => r.diem >= nguong)
-      );
-    }
-    return kq;
-  });
+  const cacLan: KetQuaKhop[][] = [];
+  for (const v of vectors) {
+    const vt = arrayText(v);
+    // dot product = cosine similarity (vì vector đã chuẩn hóa L2)
+    const rows = await prisma.$queryRaw<{ anhId: number; diem: number }[]>`
+      SELECT km."anhId",
+        (SELECT SUM(a * b) FROM unnest(km."embedding", ${vt}::float8[]) t(a, b))::float AS "diem"
+      FROM "KhuonMat" km
+      WHERE km."suKienId" = ${suKienId} AND km."embedding" IS NOT NULL
+      ORDER BY "diem" DESC
+      LIMIT ${GIOI_HAN_MOI_VECTOR}`;
+    cacLan.push(
+      rows
+        .map((r) => ({ anhId: r.anhId, diem: Number(r.diem) }))
+        .filter((r) => r.diem >= nguong)
+    );
+  }
 
   const gop = gopKetQuaTim(cacLan, gioiHan);
   if (gop.length === 0) return [];

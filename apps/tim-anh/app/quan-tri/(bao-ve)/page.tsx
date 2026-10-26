@@ -1,4 +1,5 @@
 import { headers } from "next/headers";
+import { laAdminPhien } from "@/lib/quan-tri-auth";
 import { anhBiaSuKien, danhSachSuKienAnh, prisma } from "@anh/db";
 import { taoSuKien, xoaSuKien } from "./hanh-dong";
 import { NutCopy } from "./nut-copy";
@@ -11,6 +12,7 @@ export default async function TrangQuanTri({
   searchParams: Promise<{ loi?: string }>;
 }) {
   const { loi } = await searchParams;
+  const laAdmin = await laAdminPhien();
   const suKiens = await danhSachSuKienAnh(prisma);
   const bias = new Map(
     await Promise.all(
@@ -34,9 +36,15 @@ export default async function TrangQuanTri({
         <div className="o-so-lieu"><div className="nhan">Lượt tìm</div><div className="gia-tri">{tong.tim.toLocaleString("vi-VN")}</div></div>
       </div>
 
+      {loi && (
+        <div className="loi-hop">
+          {loi === "KHONG_DU_QUYEN" ? "Tài khoản Nhân sự không có quyền này — nhờ Admin thực hiện." : `Không thực hiện được: ${loi}`}
+        </div>
+      )}
+
+      {laAdmin && (
       <details className="the" open={suKiens.length === 0}>
         <summary style={{ cursor: "pointer", fontWeight: 600 }}>＋ Tạo sự kiện mới</summary>
-        {loi && <div className="loi-hop">Không tạo được: {loi}</div>}
         <form action={taoSuKien} style={{ marginTop: 10 }}>
           <label className="nhan-truong" htmlFor="ten">Tên sự kiện / khóa học</label>
           <input className="o-nhap" id="ten" name="ten" placeholder="Khóa Marketing Dược K12" required />
@@ -60,9 +68,10 @@ export default async function TrangQuanTri({
           <button className="nut" type="submit">Tạo sự kiện</button>
         </form>
       </details>
+      )}
 
       {suKiens.length === 0 ? (
-        <div className="the"><p className="mo-ta" style={{ margin: 0 }}>Chưa có sự kiện nào — tạo sự kiện đầu tiên ở trên.</p></div>
+        <div className="the"><p className="mo-ta" style={{ margin: 0 }}>Chưa có sự kiện nào — Admin tạo sự kiện đầu tiên ở trên.</p></div>
       ) : (
         <div className="luoi-su-kien">
           {suKiens.map((sk) => {
@@ -92,15 +101,15 @@ export default async function TrangQuanTri({
                   </div>
                   <div className="thanh-tien-do" title={`Đã chỉ mục ${phanTram}%`}><div style={{ width: `${phanTram}%` }} /></div>
                   <div className="hang-nut" style={{ marginTop: 4 }}>
-                    <a className="nut nut-nho" href={`/quan-tri/${sk.id}`}>Quản lý</a>
+                    <a className="nut nut-nho" href={`/quan-tri/${sk.id}`}>{laAdmin ? "Quản lý" : "Xem"}</a>
                     <NutCopy noiDung={link} />
                     <a className="nut nut-trang nut-nho" href={link} target="_blank" rel="noreferrer">Mở trang học viên</a>
-                    <form action={xoaSuKien} style={{ marginLeft: "auto" }}>
+                    {laAdmin && <form action={xoaSuKien} style={{ marginLeft: "auto" }}>
                       <input type="hidden" name="id" value={sk.id} />
                       <NutXacNhan lop="nut nut-nguy nut-nho" hoi={`Xóa sự kiện "${sk.ten}" cùng toàn bộ ảnh upload, vector và lượt tìm?`}>
                         Xóa
                       </NutXacNhan>
-                    </form>
+                    </form>}
                   </div>
                 </div>
               </div>

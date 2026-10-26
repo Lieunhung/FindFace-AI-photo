@@ -34,10 +34,31 @@ except ImportError:
 
 # det_size lớn (1280) để bắt được mặt nhỏ trong ảnh toàn cảnh hội trường — đổi qua env khi cần
 DET_SIZE = int(os.environ.get("DET_SIZE", "1280"))
+# Selfie: mặt chiếm gần hết khung nên phát hiện ở 640 là đủ và nhanh hơn nhiều so với 1280 của ảnh toàn cảnh
+DET_SIZE_SELFIE = int(os.environ.get("DET_SIZE_SELFIE", "640"))
 BAT_CLIP = os.environ.get("CLIP", "") == "1"
 ANH_TOI_DA_BYTE = 40 * 1024 * 1024
 
 app = FastAPI(title="dich-vu-khuon-mat")
+
+
+@app.on_event("startup")
+def nap_san_model():
+    """Nạp model ngay khi khởi động: học viên đầu tiên sau khi khởi động lại không phải chờ ~6 giây."""
+    # Windows: tiến trình chạy nền/Task Scheduler dễ bị tranh CPU với trình duyệt và ứng dụng khác, làm suy luận
+    # chậm gấp ~3 lần (đo thực tế 7s → 2.7s). Nâng lên Above Normal; lỗi (không phải Windows) thì bỏ qua.
+    try:
+        import ctypes
+        from ctypes import wintypes
+
+        k32 = ctypes.WinDLL("kernel32", use_last_error=True)
+        k32.GetCurrentProcess.restype = wintypes.HANDLE
+        k32.SetPriorityClass.argtypes = [wintypes.HANDLE, wintypes.DWORD]
+        k32.SetPriorityClass.restype = wintypes.BOOL
+        k32.SetPriorityClass(k32.GetCurrentProcess(), 0x00008000)  # ABOVE_NORMAL_PRIORITY_CLASS
+    except Exception:
+        pass
+    threading.Thread(target=lay_model, daemon=True).start()
 
 _model = None
 _clip_anh = None
@@ -82,16 +103,20 @@ def doc_anh(du_lieu: bytes) -> Image.Image:
         raise HTTPException(status_code=422, detail="KHONG_DOC_DUOC_ANH")
 
 
-def tim_mat(bgr):
+def tim_mat(bgr, det_size=None):
+    det_size = det_size or DET_SIZE
     cao, rong = bgr.shape[:2]
     # Ảnh NHỎ hơn det_size: đệm vào góc canvas đen thay vì để SCRFD phóng to — phóng to làm
     # khuôn mặt vượt thang anchor và trượt phát hiện (selfie/ảnh cắt gần mặt hay dính lỗi này).
     dau_vao = bgr
-    if max(cao, rong) < DET_SIZE:
-        canvas = np.zeros((DET_SIZE, DET_SIZE, 3), dtype=np.uint8)
+    if max(cao, rong) < det_size:
+        canvas = np.zeros((det_size, det_size, 3), dtype=np.uint8)
         canvas[:cao, :rong] = bgr
         dau_vao = canvas
-    return lay_model().get(dau_vao)
+    m = lay_model()
+    # Các endpoint async chạy tuần tự trên một event loop nên đổi kích thước phát hiện theo từng lời gọi là an toàn
+    m.det_model.input_size = (det_size, det_size)
+    return m.get(dau_vao)
 
 
 @app.get("/suc-khoe")
@@ -107,14 +132,14 @@ def suc_khoe():
 
 
 @app.post("/vector")
-async def vector(anh: UploadFile = File(...)):
+async def vector(anh: UploadFile = File(...), selfie: bool = False):
     du_lieu = await anh.read()
     if len(du_lieu) > ANH_TOI_DA_BYTE:
         raise HTTPException(status_code=413, detail="ANH_QUA_LON")
     pil = doc_anh(du_lieu)
     bgr = cv2.cvtColor(np.asarray(pil), cv2.COLOR_RGB2BGR)
     cao, rong = bgr.shape[:2]
-    mats = tim_mat(bgr)
+    mats = tim_mat(bgr, DET_SIZE_SELFIE if selfie else DET_SIZE)
 
     # Chất lượng ảnh cho bộ lọc "ảnh hỏng": đo trên bản thu nhỏ 640 cho nhanh + ổn định
     nho = cv2.resize(bgr, (640, max(1, int(640 * cao / rong)))) if rong > 640 else bgr

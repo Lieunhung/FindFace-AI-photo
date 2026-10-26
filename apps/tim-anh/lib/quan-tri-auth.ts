@@ -1,5 +1,6 @@
 import { cookies } from "next/headers";
 import { createHmac, timingSafeEqual } from "node:crypto";
+import { prisma } from "@anh/db";
 
 /**
  * Phiên quản trị app tìm ảnh: một mật khẩu chung (env TIM_ANH_MAT_KHAU_QUAN_TRI) cho
@@ -78,6 +79,27 @@ export async function emailPhienQuanTri(): Promise<string | null> {
   return payload.slice(0, cach) || null;
 }
 
+/** Còn đăng nhập hợp lệ VÀ tài khoản còn tồn tại (xóa tài khoản = đá phiên ngay). */
 export async function coPhienQuanTri(): Promise<boolean> {
-  return (await emailPhienQuanTri()) !== null;
+  return (await vaiTroPhien()) !== null;
+}
+
+/** Vai trò lưu là "chu" | "phu"; giao diện gọi là Admin | Nhân sự. */
+export type VaiTro = "chu" | "phu";
+
+/**
+ * Vai trò của phiên hiện tại, tra từ CSDL mỗi lần (đổi vai trò/xóa tài khoản có hiệu lực ngay,
+ * không đợi hết hạn cookie). Mật khẩu chung env ("quan-tri") = Admin; email không còn tài khoản = null.
+ */
+export async function vaiTroPhien(): Promise<VaiTro | null> {
+  const email = await emailPhienQuanTri();
+  if (!email) return null;
+  if (email === "quan-tri") return "chu";
+  const tk = await prisma.taiKhoanQuanTri.findUnique({ where: { email }, select: { vaiTro: true } });
+  if (!tk) return null;
+  return tk.vaiTro === "chu" ? "chu" : "phu";
+}
+
+export async function laAdminPhien(): Promise<boolean> {
+  return (await vaiTroPhien()) === "chu";
 }

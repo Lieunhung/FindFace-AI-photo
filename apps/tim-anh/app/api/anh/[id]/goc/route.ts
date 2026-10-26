@@ -55,7 +55,7 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ id: string 
 
   if (suKien?.watermark) {
     try {
-      const buf = await apWatermark(duongDan, `TAKI GROUP · ${suKien.ten}`);
+      const buf = await apWatermark(duongDan, `Rowena Global · ${suKien.ten}`);
       headers.set("Content-Type", "image/jpeg");
       return new NextResponse(new Uint8Array(buf), { headers });
     } catch {

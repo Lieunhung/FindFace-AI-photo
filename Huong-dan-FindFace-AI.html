@@ -1,0 +1,672 @@
+<title>Hướng dẫn FindFace-AI</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap">
+<style>
+  :root {
+    --bg: #f5f6fa;
+    --surface: #ffffff;
+    --surface2: #eef0f7;
+    --border: #dde1ee;
+    --text: #0f1c3f;
+    --text2: #4a5578;
+    --text3: #8491b0;
+    --accent: #0ea5a0;
+    --accent-light: #e6f7f7;
+    --accent-dark: #0c8a85;
+    --admin-clr: #6366f1;
+    --admin-light: #eef2ff;
+    --student-clr: #10b981;
+    --student-light: #ecfdf5;
+    --warn: #f59e0b;
+    --warn-light: #fffbeb;
+    --code-bg: #1e2d5a;
+    --code-text: #a5f3fc;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #0a1020;
+      --surface: #111827;
+      --surface2: #1a2438;
+      --border: #2a3552;
+      --text: #e8ecf8;
+      --text2: #9aa5c4;
+      --text3: #5c6888;
+      --accent-light: #0a2e2e;
+      --admin-light: #1a1b40;
+      --student-light: #082520;
+      --warn-light: #2a1f00;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #0a1020;
+    --surface: #111827;
+    --surface2: #1a2438;
+    --border: #2a3552;
+    --text: #e8ecf8;
+    --text2: #9aa5c4;
+    --text3: #5c6888;
+    --accent-light: #0a2e2e;
+    --admin-light: #1a1b40;
+    --student-light: #082520;
+    --warn-light: #2a1f00;
+  }
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; }
+  body {
+    font-family: 'Plus Jakarta Sans', system-ui, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    font-size: 15px;
+    line-height: 1.65;
+    padding-inline: 20px;
+    padding-block: 0;
+  }
+
+  .page { max-width: 780px; margin: 0 auto; padding-block: 36px 60px; }
+
+  /* Header */
+  .doc-header {
+    text-align: center;
+    padding-block: 40px 32px;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 32px;
+  }
+  .doc-logo {
+    display: inline-flex; align-items: center; gap: 10px;
+    background: var(--accent); color: #fff;
+    font-weight: 800; font-size: 13px; letter-spacing: .06em;
+    padding: 6px 14px; border-radius: 20px;
+    text-transform: uppercase; margin-bottom: 16px;
+  }
+  .doc-header h1 {
+    font-size: clamp(22px, 5vw, 32px);
+    font-weight: 800; line-height: 1.2;
+    text-wrap: balance;
+    margin-bottom: 10px;
+  }
+  .doc-header .subtitle {
+    color: var(--text2); font-size: 14px;
+  }
+
+  /* URL Box */
+  .url-box {
+    background: var(--code-bg);
+    border-radius: 10px;
+    padding: 16px 20px;
+    margin: 24px 0;
+    display: flex; flex-wrap: wrap; align-items: center; gap: 10px;
+    overflow-x: auto;
+  }
+  .url-label {
+    font-size: 11px; font-weight: 700; letter-spacing: .08em;
+    text-transform: uppercase; color: #7dd3fc; flex-shrink: 0;
+  }
+  .url-value {
+    font-family: ui-monospace, 'Cascadia Code', monospace;
+    color: var(--code-text); font-size: 14px; word-break: break-all;
+  }
+
+  /* Tabs */
+  .tabs {
+    position: sticky; top: env(safe-area-inset-top, 0px);
+    background: var(--bg); z-index: 10;
+    padding-block: 8px;
+    margin-inline: -20px; padding-inline: 20px;
+    border-bottom: 2px solid var(--border);
+    display: flex; gap: 6px;
+  }
+  .tab-btn {
+    flex: 1;
+    display: flex; align-items: center; justify-content: center; gap: 8px;
+    padding: 10px 16px;
+    border: 2px solid var(--border); border-radius: 8px;
+    background: var(--surface); cursor: pointer;
+    font-family: inherit; font-size: 14px; font-weight: 700;
+    color: var(--text2); transition: all .15s;
+  }
+  .tab-btn:hover { border-color: var(--accent); color: var(--accent); }
+  .tab-btn.active[data-tab="admin"] {
+    background: var(--admin-light); border-color: var(--admin-clr);
+    color: var(--admin-clr);
+  }
+  .tab-btn.active[data-tab="student"] {
+    background: var(--student-light); border-color: var(--student-clr);
+    color: var(--student-clr);
+  }
+  .tab-dot {
+    width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0;
+  }
+  .tab-btn[data-tab="admin"] .tab-dot { background: var(--admin-clr); }
+  .tab-btn[data-tab="student"] .tab-dot { background: var(--student-clr); }
+
+  /* Panels */
+  .tab-panel { display: none; padding-top: 28px; }
+  .tab-panel.active { display: block; }
+
+  /* Role badge */
+  .role-badge {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 4px 12px; border-radius: 20px;
+    font-size: 12px; font-weight: 700; letter-spacing: .04em;
+    text-transform: uppercase; margin-bottom: 20px;
+  }
+  .role-badge.admin { background: var(--admin-light); color: var(--admin-clr); }
+  .role-badge.student { background: var(--student-light); color: var(--student-clr); }
+
+  /* Section */
+  .section { margin-bottom: 32px; }
+  .section-title {
+    font-size: 18px; font-weight: 800;
+    margin-bottom: 16px;
+    display: flex; align-items: center; gap: 10px;
+  }
+  .section-title::after {
+    content: ''; flex: 1; height: 1px; background: var(--border);
+  }
+
+  /* Steps */
+  .steps { display: flex; flex-direction: column; gap: 14px; }
+  .step {
+    display: flex; gap: 14px; align-items: flex-start;
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 10px; padding: 16px;
+  }
+  .step-num {
+    width: 28px; height: 28px; flex-shrink: 0;
+    border-radius: 50%; display: flex; align-items: center; justify-content: center;
+    font-size: 13px; font-weight: 800; color: #fff;
+  }
+  .admin .step-num { background: var(--admin-clr); }
+  .student .step-num { background: var(--student-clr); }
+  .step-body { flex: 1; min-width: 0; }
+  .step-title { font-weight: 700; margin-bottom: 4px; }
+  .step-desc { color: var(--text2); font-size: 14px; }
+  .step-desc code {
+    background: var(--surface2); border: 1px solid var(--border);
+    border-radius: 4px; padding: 1px 6px;
+    font-family: ui-monospace, monospace; font-size: 13px; color: var(--accent);
+  }
+
+  /* Credential card */
+  .cred-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    overflow: hidden;
+    margin-bottom: 16px;
+  }
+  .cred-header {
+    display: flex; align-items: center; gap: 8px;
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--border);
+    font-weight: 700; font-size: 13px;
+  }
+  .cred-header.admin-h { background: var(--admin-light); color: var(--admin-clr); }
+  .cred-header.student-h { background: var(--student-light); color: var(--student-clr); }
+  .cred-rows { padding: 14px 16px; display: flex; flex-direction: column; gap: 12px; }
+  .cred-row { display: flex; flex-direction: column; gap: 3px; }
+  .cred-label {
+    font-size: 11px; font-weight: 700; letter-spacing: .07em;
+    text-transform: uppercase; color: var(--text3);
+  }
+  .cred-value {
+    font-family: ui-monospace, 'Cascadia Code', monospace;
+    font-size: 14px; font-weight: 600; color: var(--text);
+    background: var(--surface2); border: 1px solid var(--border);
+    border-radius: 6px; padding: 8px 12px;
+    display: flex; justify-content: space-between; align-items: center; gap: 8px;
+    word-break: break-all;
+  }
+  .copy-btn {
+    background: none; border: none; cursor: pointer;
+    color: var(--text3); font-size: 14px; padding: 2px; flex-shrink: 0;
+    transition: color .15s;
+  }
+  .copy-btn:hover { color: var(--accent); }
+  .copy-btn.copied { color: var(--student-clr); }
+
+  /* Info / warn boxes */
+  .info-box, .warn-box, .tip-box {
+    border-radius: 8px; padding: 14px 16px;
+    font-size: 14px; line-height: 1.6;
+    display: flex; gap: 10px; align-items: flex-start;
+    margin-block: 12px;
+  }
+  .info-box { background: var(--accent-light); color: var(--accent-dark); border-left: 3px solid var(--accent); }
+  .warn-box { background: var(--warn-light); color: #92400e; border-left: 3px solid var(--warn); }
+  .tip-box { background: var(--surface2); color: var(--text2); border-left: 3px solid var(--border); }
+  @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .warn-box { color: #fbbf24; } }
+  :root[data-theme="dark"] .warn-box { color: #fbbf24; }
+
+  .box-icon { font-size: 16px; flex-shrink: 0; margin-top: 1px; }
+
+  /* Feature grid */
+  .feat-grid {
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 12px; margin-bottom: 8px;
+  }
+  .feat-card {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 10px; padding: 14px;
+  }
+  .feat-icon { font-size: 22px; margin-bottom: 8px; }
+  .feat-name { font-weight: 700; font-size: 14px; margin-bottom: 4px; }
+  .feat-desc { font-size: 13px; color: var(--text2); }
+
+  /* Troubleshoot */
+  .trouble-item {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 10px; overflow: hidden; margin-bottom: 10px;
+  }
+  .trouble-q {
+    padding: 14px 16px; font-weight: 700; font-size: 14px; cursor: pointer;
+    display: flex; justify-content: space-between; align-items: center; gap: 10px;
+    color: var(--text); list-style: none;
+    user-select: none;
+  }
+  .trouble-q::-webkit-details-marker { display: none; }
+  .trouble-q::after { content: '▸'; color: var(--text3); transition: transform .2s; }
+  details[open] .trouble-q::after { transform: rotate(90deg); }
+  .trouble-a {
+    padding: 0 16px 14px; font-size: 14px; color: var(--text2); line-height: 1.7;
+    border-top: 1px solid var(--border);
+    padding-top: 12px;
+  }
+
+  /* Footer */
+  .doc-footer {
+    margin-top: 48px; padding-top: 20px; border-top: 1px solid var(--border);
+    text-align: center; color: var(--text3); font-size: 13px;
+  }
+
+  /* Responsive */
+  @media (max-width: 500px) {
+    .tab-btn { font-size: 13px; padding: 9px 10px; }
+    .url-box { padding: 12px 14px; }
+    .url-value { font-size: 12px; }
+  }
+</style>
+
+<div class="page">
+  <div class="doc-header">
+    <div class="doc-logo">🎓 Rowena Global</div>
+    <h1>Hướng dẫn sử dụng<br>FindFace-AI</h1>
+    <div class="subtitle">Hệ thống tìm ảnh khuôn mặt thông minh · Phiên bản 2026</div>
+
+    <div class="url-box">
+      <span class="url-label">🌐 URL công khai (chia sẻ với học viên)</span>
+      <span class="url-value" id="main-url">https://a8261a73-a055-40bb-b42d-3a3a760bef20.cfargotunnel.com</span>
+    </div>
+  </div>
+
+  <!-- TABS -->
+  <div class="tabs">
+    <button class="tab-btn active" data-tab="admin" onclick="switchTab('admin')">
+      <span class="tab-dot"></span>👤 Quản trị viên
+    </button>
+    <button class="tab-btn" data-tab="student" onclick="switchTab('student')">
+      <span class="tab-dot"></span>🎓 Học viên
+    </button>
+  </div>
+
+  <!-- ADMIN PANEL -->
+  <div class="tab-panel active admin" id="panel-admin">
+    <div class="role-badge admin">⚙️ Dành cho Quản trị viên</div>
+
+    <!-- Credentials -->
+    <div class="section">
+      <div class="section-title">🔑 Thông tin đăng nhập</div>
+
+      <div class="cred-card">
+        <div class="cred-header admin-h">⚙️ Tài khoản Quản trị (mặc định — chưa tạo tài khoản riêng)</div>
+        <div class="cred-rows">
+          <div class="cred-row">
+            <div class="cred-label">Đường dẫn đăng nhập</div>
+            <div class="cred-value">
+              <span>/quan-tri/dang-nhap</span>
+              <button class="copy-btn" onclick="copyText('/quan-tri/dang-nhap', this)" title="Sao chép">📋</button>
+            </div>
+          </div>
+          <div class="cred-row">
+            <div class="cred-label">Mật khẩu (khi chưa tạo tài khoản)</div>
+            <div class="cred-value">
+              <span id="pw-val">Rowena2026</span>
+              <button class="copy-btn" onclick="copyText('Rowena2026', this)" title="Sao chép">📋</button>
+            </div>
+          </div>
+          <div class="cred-row">
+            <div class="cred-label">URL đăng nhập đầy đủ</div>
+            <div class="cred-value" style="font-size:12px">
+              <span>https://a8261a73-a055-40bb-b42d-3a3a760bef20.cfargotunnel.com/quan-tri/dang-nhap</span>
+              <button class="copy-btn" onclick="copyText('https://a8261a73-a055-40bb-b42d-3a3a760bef20.cfargotunnel.com/quan-tri/dang-nhap', this)" title="Sao chép">📋</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="warn-box">
+        <span class="box-icon">⚠️</span>
+        <span><b>Khi đã tạo tài khoản riêng:</b> đăng nhập bằng <b>email + mật khẩu</b> của tài khoản đó thay vì mật khẩu chung ở trên. Vào <b>Tài khoản</b> trong trang quản trị để tạo/quản lý tài khoản.</span>
+      </div>
+
+      <div class="cred-card" style="margin-top:16px">
+        <div class="cred-header admin-h">💻 URL nội bộ (chỉ dùng trên máy cài đặt)</div>
+        <div class="cred-rows">
+          <div class="cred-row">
+            <div class="cred-label">Localhost</div>
+            <div class="cred-value">
+              <span>http://localhost:3002</span>
+              <button class="copy-btn" onclick="copyText('http://localhost:3002', this)" title="Sao chép">📋</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Start the system -->
+    <div class="section">
+      <div class="section-title">🚀 Khởi động hệ thống</div>
+      <div class="steps admin">
+        <div class="step">
+          <div class="step-num">1</div>
+          <div class="step-body">
+            <div class="step-title">Mở máy tính và đăng nhập Windows</div>
+            <div class="step-desc">Đảm bảo máy có kết nối Internet để Cloudflare Tunnel kết nối được.</div>
+          </div>
+        </div>
+        <div class="step">
+          <div class="step-num">2</div>
+          <div class="step-body">
+            <div class="step-title">Nhấp đúp vào <code>start-all.bat</code> trên Desktop</div>
+            <div class="step-desc">File này tự động khởi động cả 3 dịch vụ: Face Service (cổng 8100), Web App (cổng 3002), và Cloudflare Tunnel. Cửa sổ lệnh sẽ hiện URL công khai khi hoàn tất.</div>
+          </div>
+        </div>
+        <div class="step">
+          <div class="step-num">3</div>
+          <div class="step-body">
+            <div class="step-title">Chờ khoảng 15–20 giây cho đến khi hiện URL</div>
+            <div class="step-desc">Cửa sổ sẽ hiển thị: <code>https://a8261a73-...cfargotunnel.com</code>. Giữ cửa sổ này mở trong suốt thời gian dùng.</div>
+          </div>
+        </div>
+        <div class="step">
+          <div class="step-num">4</div>
+          <div class="step-body">
+            <div class="step-title">Truy cập trang quản trị</div>
+            <div class="step-desc">Mở trình duyệt, vào <code>localhost:3002/quan-tri/dang-nhap</code> (hoặc URL công khai + <code>/quan-tri/dang-nhap</code>) và đăng nhập.</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="info-box" style="margin-top:16px">
+        <span class="box-icon">ℹ️</span>
+        <span>Khi tắt máy hoặc đóng cửa sổ lệnh, URL công khai sẽ ngừng hoạt động. Khởi động lại bằng cách nhấp đúp <code>start-all.bat</code>.</span>
+      </div>
+    </div>
+
+    <!-- Admin features -->
+    <div class="section">
+      <div class="section-title">📋 Các chức năng quản trị</div>
+
+      <div class="feat-grid">
+        <div class="feat-card">
+          <div class="feat-icon">📁</div>
+          <div class="feat-name">Tạo sự kiện / Album</div>
+          <div class="feat-desc">Tạo album cho từng khóa học. Đặt tên, ngày, mã đường dẫn và hạn xóa dữ liệu mặt.</div>
+        </div>
+        <div class="feat-card">
+          <div class="feat-icon">📤</div>
+          <div class="feat-name">Tải ảnh lên</div>
+          <div class="feat-desc">Upload hàng loạt ảnh vào album. Hệ thống tự lập chỉ mục khuôn mặt trong nền.</div>
+        </div>
+        <div class="feat-card">
+          <div class="feat-icon">🔗</div>
+          <div class="feat-name">Chia sẻ link / QR</div>
+          <div class="feat-desc">Mỗi album có link riêng và mã QR để phát cho học viên. Sao chép 1 click.</div>
+        </div>
+        <div class="feat-card">
+          <div class="feat-icon">📊</div>
+          <div class="feat-name">Theo dõi thống kê</div>
+          <div class="feat-desc">Xem tổng ảnh, khuôn mặt đã lập chỉ mục, lượt tìm kiếm theo từng album.</div>
+        </div>
+        <div class="feat-card">
+          <div class="feat-icon">👥</div>
+          <div class="feat-name">Quản lý tài khoản</div>
+          <div class="feat-desc">Tạo tài khoản quản trị riêng (email + mật khẩu) với nhật ký đăng nhập.</div>
+        </div>
+        <div class="feat-card">
+          <div class="feat-icon">📋</div>
+          <div class="feat-name">Nhật ký hoạt động</div>
+          <div class="feat-desc">Xem lịch sử đăng nhập và hoạt động của từng tài khoản quản trị.</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Upload guide -->
+    <div class="section">
+      <div class="section-title">📤 Quy trình tải ảnh lên album</div>
+      <div class="steps admin">
+        <div class="step">
+          <div class="step-num">1</div>
+          <div class="step-body">
+            <div class="step-title">Vào trang quản trị → Chọn album</div>
+            <div class="step-desc">Nhấp vào tên album trên trang chính quản trị.</div>
+          </div>
+        </div>
+        <div class="step">
+          <div class="step-num">2</div>
+          <div class="step-body">
+            <div class="step-title">Nhấn "Tải ảnh lên"</div>
+            <div class="step-desc">Chọn nhiều ảnh cùng lúc (JPG, PNG). Hệ thống hỗ trợ upload hàng loạt.</div>
+          </div>
+        </div>
+        <div class="step">
+          <div class="step-num">3</div>
+          <div class="step-body">
+            <div class="step-title">Chờ lập chỉ mục khuôn mặt</div>
+            <div class="step-desc">Sau khi upload, hệ thống tự phát hiện và lập chỉ mục khuôn mặt. Tiến độ hiển thị trên thẻ album (ví dụ: <code>850/1000 ảnh đã xử lý</code>).</div>
+          </div>
+        </div>
+        <div class="step">
+          <div class="step-num">4</div>
+          <div class="step-body">
+            <div class="step-title">Chia sẻ link hoặc QR cho học viên</div>
+            <div class="step-desc">Nhấn nút sao chép link hoặc tải QR code để phát cho học viên tìm ảnh.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- STUDENT PANEL -->
+  <div class="tab-panel" id="panel-student">
+    <div class="role-badge student">🎓 Dành cho Học viên</div>
+
+    <div class="cred-card">
+      <div class="cred-header student-h">✅ Học viên không cần đăng nhập!</div>
+      <div class="cred-rows">
+        <div class="cred-row">
+          <div class="cred-label">URL truy cập (nhận từ ban tổ chức)</div>
+          <div class="cred-value" style="font-size:12px">
+            <span>https://a8261a73-a055-40bb-b42d-3a3a760bef20.cfargotunnel.com</span>
+            <button class="copy-btn" onclick="copyText('https://a8261a73-a055-40bb-b42d-3a3a760bef20.cfargotunnel.com', this)" title="Sao chép">📋</button>
+          </div>
+        </div>
+        <div class="cred-row">
+          <div class="cred-label">Hoặc</div>
+          <div class="cred-value" style="background:transparent; border:none; padding:4px 0; font-family:inherit; font-size:14px; color: var(--text2);">
+            📷 Quét mã QR do ban tổ chức phát — không cần gõ URL
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="section-title">📸 Cách tìm ảnh của bạn</div>
+      <div class="steps student">
+        <div class="step">
+          <div class="step-num">1</div>
+          <div class="step-body">
+            <div class="step-title">Mở link hoặc quét mã QR</div>
+            <div class="step-desc">Dùng điện thoại hoặc máy tính. Quét QR do ban tổ chức phát, hoặc nhập link bên trên vào trình duyệt. Không cần đăng nhập hay cài app.</div>
+          </div>
+        </div>
+        <div class="step">
+          <div class="step-num">2</div>
+          <div class="step-body">
+            <div class="step-title">Chọn album khóa học của bạn</div>
+            <div class="step-desc">Trang chủ hiển thị danh sách các album đang mở. Nhấp vào album của khóa học bạn tham dự, hoặc nhập mã album nếu ban tổ chức có cung cấp.</div>
+          </div>
+        </div>
+        <div class="step">
+          <div class="step-num">3</div>
+          <div class="step-body">
+            <div class="step-title">Chụp ảnh selfie</div>
+            <div class="step-desc">Nhấn <b>"Tìm ảnh của tôi"</b> → cho phép truy cập camera → chụp ảnh selfie rõ mặt, đủ sáng, nhìn thẳng vào camera. Ảnh selfie <b>chỉ dùng để tìm kiếm</b>, không lưu lại.</div>
+          </div>
+        </div>
+        <div class="step">
+          <div class="step-num">4</div>
+          <div class="step-body">
+            <div class="step-title">Xem và tải ảnh của bạn</div>
+            <div class="step-desc">Hệ thống trả về tất cả ảnh có mặt bạn trong vài giây. Nhấp vào từng ảnh để xem full size và tải về.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="section">
+      <div class="section-title">💡 Mẹo chụp selfie hiệu quả</div>
+      <div class="feat-grid">
+        <div class="feat-card">
+          <div class="feat-icon">☀️</div>
+          <div class="feat-name">Đủ ánh sáng</div>
+          <div class="feat-desc">Chụp nơi có ánh sáng tốt — tránh ngược sáng hoặc tối quá.</div>
+        </div>
+        <div class="feat-card">
+          <div class="feat-icon">👁️</div>
+          <div class="feat-name">Nhìn thẳng</div>
+          <div class="feat-desc">Mắt nhìn thẳng vào camera, không nghiêng đầu quá 30°.</div>
+        </div>
+        <div class="feat-card">
+          <div class="feat-icon">🚫</div>
+          <div class="feat-name">Không đeo kính đen</div>
+          <div class="feat-desc">Kính mắt thường OK. Kính râm, mũ che mặt sẽ giảm độ chính xác.</div>
+        </div>
+        <div class="feat-card">
+          <div class="feat-icon">📏</div>
+          <div class="feat-name">Khoảng cách vừa phải</div>
+          <div class="feat-desc">Giữ mặt chiếm khoảng ⅓ – ½ khung hình để hệ thống nhận diện tốt nhất.</div>
+        </div>
+      </div>
+
+      <div class="tip-box">
+        <span class="box-icon">💬</span>
+        <span>Nếu không tìm thấy ảnh, thử chụp lại selfie ở góc/ánh sáng khác. Hệ thống có thể chưa xử lý xong tất cả ảnh nếu album vừa được upload — hỏi ban tổ chức để biết tiến độ.</span>
+      </div>
+    </div>
+
+    <!-- Library viewing -->
+    <div class="section">
+      <div class="section-title">🖼️ Xem thư viện ảnh</div>
+      <div class="steps student">
+        <div class="step">
+          <div class="step-num">1</div>
+          <div class="step-body">
+            <div class="step-title">Vào album → Nhấn "Thư viện"</div>
+            <div class="step-desc">Nếu ban tổ chức bật tính năng này, bạn có thể xem toàn bộ ảnh của album mà không cần selfie.</div>
+          </div>
+        </div>
+        <div class="step">
+          <div class="step-num">2</div>
+          <div class="step-body">
+            <div class="step-title">Duyệt và tải ảnh</div>
+            <div class="step-desc">Ảnh hiển thị dạng lưới. Nhấp để phóng to và tải về từng ảnh.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- TROUBLESHOOTING (shared) -->
+  <div style="margin-top: 40px; padding-top: 28px; border-top: 1px solid var(--border);">
+    <div class="section-title">🔧 Xử lý sự cố thường gặp</div>
+
+    <details class="trouble-item">
+      <summary class="trouble-q">Camera không hoạt động / không xin quyền</summary>
+      <div class="trouble-a">
+        Trình duyệt cần quyền camera. Nhấp vào biểu tượng ổ khóa 🔒 trên thanh địa chỉ → <b>Quyền truy cập camera</b> → <b>Cho phép</b>. Sau đó tải lại trang và thử lại. Trên iOS: Cài đặt → Safari/Chrome → Camera → Cho phép.
+      </div>
+    </details>
+
+    <details class="trouble-item">
+      <summary class="trouble-q">Không tìm thấy ảnh nào dù có mặt trong album</summary>
+      <div class="trouble-a">
+        1. Thử chụp selfie lại với ánh sáng tốt hơn và nhìn thẳng.<br>
+        2. Album có thể chưa lập chỉ mục xong — kiểm tra tiến độ với quản trị viên (ví dụ: còn 30% ảnh chưa xử lý).<br>
+        3. Ảnh của bạn trong album có thể bị mờ, góc nghiêng nhiều — hệ thống có thể không nhận ra. Hỏi ban tổ chức để hỗ trợ.
+      </div>
+    </details>
+
+    <details class="trouble-item">
+      <summary class="trouble-q">Trang không mở được / báo lỗi kết nối</summary>
+      <div class="trouble-a">
+        URL công khai chỉ hoạt động khi máy chủ của Rowena Global đang bật và ứng dụng đang chạy.<br>
+        → Liên hệ quản trị viên để xác nhận <b>start-all.bat</b> đã được chạy.<br>
+        → Nếu cửa sổ lệnh bị đóng nhầm, quản trị viên mở lại bằng cách nhấp đúp <code>start-all.bat</code>.
+      </div>
+    </details>
+
+    <details class="trouble-item">
+      <summary class="trouble-q">Đăng nhập quản trị báo "Mật khẩu sai"</summary>
+      <div class="trouble-a">
+        Nếu đã tạo tài khoản riêng: dùng <b>email + mật khẩu</b> của tài khoản đó, không dùng mật khẩu chung.<br>
+        Nếu chưa tạo tài khoản: mật khẩu chung là <code>Rowena2026</code> (phân biệt hoa/thường).<br>
+        Lưu ý: hệ thống chặn đăng nhập sai 10 lần/giờ theo IP — chờ 1 giờ nếu bị khóa.
+      </div>
+    </details>
+
+    <details class="trouble-item">
+      <summary class="trouble-q">Ảnh tải lên nhưng chưa xuất hiện khi tìm kiếm</summary>
+      <div class="trouble-a">
+        Hệ thống lập chỉ mục khuôn mặt chạy trong nền — số lượng ảnh càng lớn càng lâu. Kiểm tra tiến độ trên thẻ album trong trang quản trị. Chỉ ảnh đã lập chỉ mục xong mới xuất hiện trong kết quả tìm kiếm.
+      </div>
+    </details>
+  </div>
+
+  <div class="doc-footer">
+    <div>FindFace-AI · Rowena Global · 2026</div>
+    <div style="margin-top:4px">Hệ thống nhận diện khuôn mặt tuân thủ Nghị định 13/2023 — vector khuôn mặt tự xóa sau thời hạn đã đặt</div>
+  </div>
+</div>
+
+<script>
+  function switchTab(name) {
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b.dataset.tab === name));
+    document.querySelectorAll('.tab-panel').forEach(p => p.classList.toggle('active', p.id === 'panel-' + name));
+    try { localStorage.setItem('rg-guide-tab', name); } catch(e) {}
+  }
+
+  // Restore tab
+  try {
+    const saved = localStorage.getItem('rg-guide-tab');
+    if (saved) switchTab(saved);
+  } catch(e) {}
+
+  function copyText(text, btn) {
+    navigator.clipboard.writeText(text).then(() => {
+      const orig = btn.textContent;
+      btn.textContent = '✅';
+      btn.classList.add('copied');
+      setTimeout(() => { btn.textContent = orig; btn.classList.remove('copied'); }, 1800);
+    }).catch(() => {
+      // fallback
+      const ta = document.createElement('textarea');
+      ta.value = text; ta.style.position = 'fixed'; ta.style.opacity = '0';
+      document.body.appendChild(ta); ta.focus(); ta.select();
+      document.execCommand('copy');
+      document.body.removeChild(ta);
+      btn.textContent = '✅'; btn.classList.add('copied');
+      setTimeout(() => { btn.textContent = '📋'; btn.classList.remove('copied'); }, 1800);
+    });
+  }
+</script>

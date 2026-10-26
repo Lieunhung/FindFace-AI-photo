@@ -7,14 +7,15 @@ import { NGUONG_TIM_ANH_MAC_DINH, type KetQuaKhop } from "@anh/core";
  * Album giữ MỘT vector mặt chủ album (emb) khi học viên đồng ý — nhờ đó ảnh chụp bổ sung
  * được tự nạp vào album và báo qua email. emb xóa cùng hạn sinh trắc của sự kiện
  * (job don-tim-anh) → album "đóng băng": ảnh cũ vẫn xem, không nạp mới nữa.
+ * Vector lưu dạng float8[] (không dùng pgvector); cosine = dot product (vector L2-normalized).
  */
 
 const SO_CHIEU = 512;
 
-function vectorText(v: number[]): string {
+function arrayText(v: number[]): string {
   if (!Array.isArray(v) || v.length !== SO_CHIEU) throw new Error("VECTOR_PHAI_512_CHIEU");
   for (const x of v) if (typeof x !== "number" || !Number.isFinite(x)) throw new Error("VECTOR_GIA_TRI_KHONG_HOP_LE");
-  return `[${v.join(",")}]`;
+  return `{${v.join(",")}}`;
 }
 
 // ---- Album cá nhân ----
@@ -34,14 +35,14 @@ export async function taoAlbumCaNhan(
   // $queryRaw): cột timestamp không múi giờ mà now() ghi giờ máy chủ, ORM ghi UTC còn tham số
   // Date trong raw lại serialize giờ địa phương — trộn nguồn làm so sánh thời gian lệch 7 tiếng.
   const luc = new Date();
-  const embText = vectorText(emb); // kiểm CHẶT trước khi mở transaction
+  const embText = arrayText(emb); // kiểm CHẶT trước khi mở transaction
   // Một transaction trọn gói — đứt giữa chừng không để lại album mồ côi thiếu vector
   return prisma.$transaction(async (tx) => {
     const album = await tx.albumCaNhan.create({
       data: { token, suKienId, lienHe: lienHeChuan, taoLuc: luc, capNhatLuc: luc },
       select: { id: true },
     });
-    await tx.$executeRaw`UPDATE "AlbumCaNhan" SET "emb" = ${embText}::vector WHERE "id" = ${album.id}`;
+    await tx.$executeRaw`UPDATE "AlbumCaNhan" SET "emb" = ${embText}::float8[] WHERE "id" = ${album.id}`;
     if (ketQua.length > 0) {
       await tx.anhAlbum.createMany({
         // ảnh có sẵn lúc tạo coi như "đã báo" — email chỉ nói về ảnh MỚI sau này
@@ -97,14 +98,16 @@ export async function capNhatCacAlbum(prisma: PrismaClient, suKienId?: number) {
   for (const al of albums) {
     // Mốc "mới hơn lần quét trước" so CỘT-với-CỘT trong SQL (subselect) — cả hai đều do ORM
     // ghi UTC nên nhất quán; tuyệt đối không đưa Date làm tham số raw (bị serialize giờ máy).
+    // Dot product thay cho <=> (không có pgvector); max theo anhId để lấy khuôn mặt giống nhất.
     const moi = await prisma.$queryRaw<{ anhId: number; diem: number }[]>`
-      SELECT km."anhId", max(1 - (km."embedding" <=> ${al.emb}::vector))::float AS "diem"
+      SELECT km."anhId",
+        max((SELECT SUM(a * b) FROM unnest(km."embedding", ${al.emb}::float8[]) t(a, b)))::float AS "diem"
       FROM "KhuonMat" km
       JOIN "AnhSuKien" anh ON anh."id" = km."anhId"
       WHERE km."suKienId" = ${al.suKienId} AND km."embedding" IS NOT NULL
         AND anh."chiMucLuc" > (SELECT "capNhatLuc" FROM "AlbumCaNhan" WHERE "id" = ${al.id})
       GROUP BY km."anhId"
-      HAVING max(1 - (km."embedding" <=> ${al.emb}::vector)) >= ${NGUONG_TIM_ANH_MAC_DINH}`;
+      HAVING max((SELECT SUM(a * b) FROM unnest(km."embedding", ${al.emb}::float8[]) t(a, b))) >= ${NGUONG_TIM_ANH_MAC_DINH}`;
     if (moi.length > 0) {
       await prisma.anhAlbum.createMany({
         data: moi.map((m) => ({ albumId: al.id, anhId: m.anhId, diem: m.diem })),
@@ -149,7 +152,9 @@ const NGUONG_CUM = 0.55; // chặt hơn ngưỡng tìm — vào cụm là "chắ
 const TOI_DA_MAT_GOM = 30_000;
 
 function docVector(text: string): Float64Array {
-  return Float64Array.from(text.slice(1, -1).split(","), Number);
+  // Hỗ trợ cả định dạng PostgreSQL array {a,b,c} và text cũ [a,b,c]
+  const cleaned = text.replace(/^[{\[]/, "").replace(/[}\]]$/, "");
+  return Float64Array.from(cleaned.split(","), Number);
 }
 
 /** Gom lại TOÀN BỘ cụm của một sự kiện (greedy theo centroid, mặt nét nhất làm hạt giống). */

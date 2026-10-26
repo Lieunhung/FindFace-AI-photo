@@ -1,3 +1,5 @@
+import { redirect } from "next/navigation";
+import { laAdminPhien } from "@/lib/quan-tri-auth";
 import { danhSachTaiKhoanQuanTri, prisma } from "@anh/db";
 import { taoTaiKhoan, xoaTaiKhoan } from "../hanh-dong";
 import { NutXacNhan } from "../nut-xac-nhan";
@@ -8,6 +10,7 @@ export default async function TrangTaiKhoan({
 }: {
   searchParams: Promise<{ loi?: string }>;
 }) {
+  if (!(await laAdminPhien())) redirect("/quan-tri?loi=KHONG_DU_QUYEN");
   const { loi } = await searchParams;
   const taiKhoans = await danhSachTaiKhoanQuanTri(prisma);
 
@@ -17,10 +20,10 @@ export default async function TrangTaiKhoan({
         <h1 style={{ fontSize: 22 }}>Tài khoản quản trị</h1>
         <p className="mo-ta">
           {taiKhoans.length === 0
-            ? "Chưa có tài khoản — cả hệ đang dùng mật khẩu chung. Tạo tài khoản đầu tiên (vai trò Chủ) để mỗi người một đăng nhập, thao tác có nhật ký theo tên."
-            : "Đăng nhập bằng email + mật khẩu riêng; vai trò Chủ được quản lý tài khoản."}
+            ? "Chưa có tài khoản — cả hệ đang dùng mật khẩu chung. Tạo tài khoản đầu tiên (vai trò Admin) để mỗi người một đăng nhập, thao tác có nhật ký theo tên."
+            : "Đăng nhập bằng email + mật khẩu riêng; Admin quản lý tài khoản, Nhân sự chỉ xem và gửi link."}
         </p>
-        {loi && <div className="loi-hop">{loi === "KHONG_XOA_CHU_CUOI" ? "Không thể xóa tài khoản Chủ cuối cùng." : loi}</div>}
+        {loi && <div className="loi-hop">{loi === "KHONG_XOA_CHU_CUOI" ? "Không thể xóa tài khoản Admin cuối cùng." : loi}</div>}
         <form action={taoTaiKhoan}>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(170px, 1fr))", gap: 10 }}>
             <div>
@@ -38,8 +41,8 @@ export default async function TrangTaiKhoan({
             <div>
               <label className="nhan-truong">Vai trò</label>
               <select className="o-nhap" name="vai_tro" defaultValue={taiKhoans.length === 0 ? "chu" : "phu"} style={{ width: "100%" }}>
-                <option value="chu">Chủ (quản tài khoản)</option>
-                <option value="phu">Phụ (vận hành)</option>
+                <option value="chu">Admin (toàn quyền)</option>
+                <option value="phu">Nhân sự (xem, in QR, gửi link)</option>
               </select>
             </div>
           </div>
@@ -56,7 +59,7 @@ export default async function TrangTaiKhoan({
                 <tr key={tk.id}>
                   <td>{tk.hoTen}</td>
                   <td>{tk.email}</td>
-                  <td>{tk.vaiTro === "chu" ? <span className="badge badge-xanh">Chủ</span> : <span className="badge badge-xam">Phụ</span>}</td>
+                  <td>{tk.vaiTro === "chu" ? <span className="badge badge-xanh">Admin</span> : <span className="badge badge-xam">Nhân sự</span>}</td>
                   <td className="mo-ta">{tk.taoLuc.toLocaleDateString("vi-VN")}</td>
                   <td>
                     <form action={xoaTaiKhoan}>

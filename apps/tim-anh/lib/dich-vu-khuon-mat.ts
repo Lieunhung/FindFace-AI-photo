@@ -8,10 +8,12 @@ export interface MatPhatHien {
   vector: number[]; // 512 chiều chuẩn hóa L2
 }
 
-export async function layVectorAnh(anh: Blob, tenTep: string): Promise<MatPhatHien[]> {
+/** selfie=true: phát hiện mặt ở độ phân giải thấp (nhanh hơn nhiều) — chỉ dùng cho ảnh chụp chân dung học viên. */
+export async function layVectorAnh(anh: Blob, tenTep: string, tuyChon: { selfie?: boolean } = {}): Promise<MatPhatHien[]> {
   const form = new FormData();
   form.append("anh", anh, tenTep);
-  const res = await fetch(`${DICH_VU_URL}/vector`, { method: "POST", body: form });
+  // Timeout để face service treo không kéo web treo theo (selfie CPU ~1–3 giây, lần đầu nạp model ~6 giây)
+  const res = await fetch(`${DICH_VU_URL}/vector${tuyChon.selfie ? "?selfie=true" : ""}`, { method: "POST", body: form, signal: AbortSignal.timeout(60_000) });
   if (!res.ok) throw new Error(`DICH_VU_KHUON_MAT_${res.status}`);
   const json = (await res.json()) as { mats: MatPhatHien[] };
   return json.mats;

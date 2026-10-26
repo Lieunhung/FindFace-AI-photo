@@ -1,0 +1,5 @@
+@echo off
+REM Dung toan bo FindFace-AI (giam sat + face service + web + worker + tunnel). Khong dung Postgres.
+powershell -NoProfile -ExecutionPolicy Bypass -Command "Get-CimInstance Win32_Process | Where-Object { $_.CommandLine -like '*ff-giam-sat*' -and $_.ProcessId -ne $PID -and ($_.Name -eq 'node.exe' -or $_.Name -eq 'powershell.exe') } | ForEach-Object { taskkill /PID $_.ProcessId /T /F | Out-Null }; foreach($p in 3002,8100){ Get-NetTCPConnection -LocalPort $p -State Listen -ErrorAction SilentlyContinue | ForEach-Object { taskkill /PID $_.OwningProcess /T /F | Out-Null } }; Get-CimInstance Win32_Process -Filter \"Name='cloudflared.exe'\" | Where-Object { $_.ExecutablePath -like 'D:\sc3\FindFace-AI*' } | ForEach-Object { taskkill /PID $_.ProcessId /T /F | Out-Null }; Get-CimInstance Win32_Process -Filter \"Name='node.exe'\" | Where-Object { $_.CommandLine -like '*FindFace-AI*' -and $_.CommandLine -like '*worker*' } | ForEach-Object { taskkill /PID $_.ProcessId /T /F | Out-Null }"
+echo Da dung FindFace-AI.
+ping -n 4 127.0.0.1 >nul

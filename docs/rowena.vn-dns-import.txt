@@ -1,0 +1,15 @@
+; Ban ghi DNS hien tai cua rowena.vn tai iNET (doc tu DNS cong khai 07/10/2026) - dung de IMPORT vao Cloudflare.
+; Cloudflare: DNS > Records > Import and export > Import > chon file nay.
+; Ban ghi A va CNAME www duoc nhap o che do "DNS only" (dam may xam) - dung cho Render. KHONG bat proxy.
+; Khong gom ban ghi anh.rowena.vn: sau khi domain Active se them o buoc rieng (Published application route).
+
+$ORIGIN rowena.vn.
+$TTL 300
+
+@       300 IN A      216.24.57.1
+www     300 IN CNAME  rowena-course-sales-system.onrender.com.
+@       300 IN MX     1 smtp.google.com.
+@       300 IN TXT    "v=spf1 include:_spf.google.com ~all"
+_dmarc  300 IN TXT    "v=DMARC1; p=none; rua=mailto:contact@rowena.vn"
+google._domainkey 300 IN TXT ( "v=DKIM1; k=rsa; p=MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAsgV43odIsu6hPKoLonS9RXygyOorRn7jpRtkezmWId04ERjG0jdT8IR5ivPbIe1TvpbrYYHTsr+8UuS2kM5X2RVWgveMqAu6s9IS2Td53x/OIj+opl+SevsYdRzXmGT0hhLaRjqicKPLYBcC+Myc2CXA13zVaW2GpFUjU3Hb5Uhxg4HzbBcPLmsPmlB9vyQue"
+        "ZytLbltQ4bWMJUXcJ6EFMFCik2/riJm1iRAIgoZTmhr23HGE2zFtBkWs3A5TjEenLJfgzy5cOun9v7NdksV/C8dUxdEOnMPm8D3z9EeGEinWJEz5wJxJRghoVdrZFqH54d+x3z9gSW1Jh3qRnQxHwIDAQAB" )

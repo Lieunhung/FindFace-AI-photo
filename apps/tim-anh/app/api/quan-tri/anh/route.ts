@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { unlink } from "node:fs/promises";
 import { chuyenAnhVaoThuMuc, danhSachAnhThuVien, duongDanChuyenDoi, duongDanThumb, duongDanThumb1600, prisma, thuMucAnhGoc, xoaAnhChon } from "@anh/db";
-import { coPhienQuanTri } from "@/lib/quan-tri-auth";
+import { coPhienQuanTri, laAdminPhien } from "@/lib/quan-tri-auth";
 
 /**
  * Quản trị ảnh trong sự kiện:
@@ -29,6 +29,7 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   if (!(await coPhienQuanTri())) return NextResponse.json({ loi: "CHUA_DANG_NHAP" }, { status: 401 });
+  if (!(await laAdminPhien())) return NextResponse.json({ loi: "KHONG_DU_QUYEN" }, { status: 403 });
   const body = (await req.json()) as { viec?: string; suKienId?: number; ids?: number[]; thuMucId?: number | null };
   const suKienId = Number(body.suKienId);
   const ids = (body.ids ?? []).map(Number).filter((n) => Number.isInteger(n)).slice(0, 500);

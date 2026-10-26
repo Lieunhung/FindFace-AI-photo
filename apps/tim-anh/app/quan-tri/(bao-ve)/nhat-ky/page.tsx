@@ -1,3 +1,5 @@
+import { redirect } from "next/navigation";
+import { laAdminPhien } from "@/lib/quan-tri-auth";
 import { danhSachNhatKy, prisma } from "@anh/db";
 
 const TEN_HANH_DONG: Record<string, string> = {
@@ -15,6 +17,7 @@ const TEN_HANH_DONG: Record<string, string> = {
 
 /** Nhật ký thao tác quản trị — 200 dòng gần nhất, mới trước. */
 export default async function TrangNhatKy() {
+  if (!(await laAdminPhien())) redirect("/quan-tri?loi=KHONG_DU_QUYEN");
   const nhatKy = await danhSachNhatKy(prisma, 200);
   return (
     <div className="the">

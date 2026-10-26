@@ -1,6 +1,7 @@
 import { headers } from "next/headers";
 import { notFound } from "next/navigation";
 import QRCode from "qrcode";
+import { laAdminPhien } from "@/lib/quan-tri-auth";
 import { danhSachCum, danhSachThuMuc, prisma, thongKeMoRong, thongKeSuKien } from "@anh/db";
 import {
   batTatThuVien,
@@ -31,6 +32,7 @@ export default async function TrangChiTiet({
   const { loi, dong_bo } = await searchParams;
   const suKienId = Number(id);
   if (!Number.isInteger(suKienId)) notFound();
+  const laAdmin = await laAdminPhien();
 
   const suKien = await prisma.suKienAnh.findUnique({ where: { id: suKienId } });
   if (!suKien) notFound();
@@ -99,6 +101,8 @@ export default async function TrangChiTiet({
             <div className="o-link"><code>{linkSuKien}</code><NutCopy noiDung={linkSuKien} /></div>
             <div className="nhan-truong">Thư viện toàn bộ ảnh</div>
             <div className="o-link"><code>{linkThuVien}</code><NutCopy noiDung={linkThuVien} /></div>
+            {laAdmin && (
+              <>
             <hr className="vach" />
             <form action={batTatThuVien} className="hang-nut">
               <input type="hidden" name="id" value={suKienId} />
@@ -126,8 +130,11 @@ export default async function TrangChiTiet({
             <p className="ghi-chu-phap-ly" style={{ marginBottom: 0 }}>
               Bật thì bản xem lớn + ảnh tải về đóng mờ tên sự kiện; ảnh gốc trên máy chủ giữ sạch.
             </p>
+              </>
+            )}
           </div>
 
+          {laAdmin && (
           <div className="the">
             <h2>Nạp ảnh</h2>
             <TaiLen suKienId={suKienId} thuMucs={dsThuMuc.thuMucs} />
@@ -152,6 +159,8 @@ export default async function TrangChiTiet({
             </form>
           </div>
 
+          )}
+
           <div className="the">
             <h2>Tiến độ & riêng tư</h2>
             <div className="thanh-tien-do"><div style={{ width: `${phanTram}%` }} /></div>
@@ -168,10 +177,10 @@ export default async function TrangChiTiet({
                     ))}
                   </tbody>
                 </table>
-                <form action={chiMucLaiLoi} style={{ marginBottom: 10 }}>
+                {laAdmin && <form action={chiMucLaiLoi} style={{ marginBottom: 10 }}>
                   <input type="hidden" name="id" value={suKienId} />
                   <button className="nut nut-phu nut-nho" type="submit">Chỉ mục lại các ảnh lỗi</button>
-                </form>
+                </form>}
               </>
             )}
             <hr className="vach" />
@@ -179,7 +188,7 @@ export default async function TrangChiTiet({
               Vector khuôn mặt tự xóa sau {suKien.hanXoaNgay} ngày kể từ sự kiện (job chạy đêm). Cần dừng
               sớm — ví dụ có học viên yêu cầu — thì xóa ngay; ảnh gốc giữ nguyên.
             </p>
-            {!suKien.daXoaMat && (
+            {laAdmin && !suKien.daXoaMat && (
               <form action={xoaVectorNgay}>
                 <input type="hidden" name="id" value={suKienId} />
                 <NutXacNhan lop="nut nut-nguy nut-nho" hoi="Xóa toàn bộ vector khuôn mặt của sự kiện ngay bây giờ? Học viên sẽ không tìm bằng selfie được nữa.">
@@ -194,14 +203,14 @@ export default async function TrangChiTiet({
         <div className="the" id="nhan-vat">
           <div className="hang-nut" style={{ justifyContent: "space-between", marginBottom: 6 }}>
             <h2 style={{ margin: 0 }}>Nhân vật trong sự kiện {cums.length > 0 && <span className="badge badge-xam">{cums.length} người</span>}</h2>
-            <form action={gomCumNgay}>
+            {laAdmin && <form action={gomCumNgay}>
               <input type="hidden" name="id" value={suKienId} />
               <button className="nut nut-phu nut-nho" type="submit">↻ Gom lại ngay</button>
-            </form>
+            </form>}
           </div>
           {cums.length === 0 ? (
             <p className="mo-ta" style={{ margin: 0 }}>
-              Chưa gom cụm — bấm "Gom lại ngay" sau khi chỉ mục xong (job cũng tự chạy 03:00 hằng đêm).
+              Chưa gom cụm — {laAdmin ? 'bấm "Gom lại ngay" sau khi chỉ mục xong (' : "hệ thống tự gom ("}job tự chạy 03:00 hằng đêm).
               Mỗi cụm là một người; thấy ngay ai nhiều/ít ảnh.
             </p>
           ) : (
@@ -249,27 +258,34 @@ export default async function TrangChiTiet({
         <div className="the">
           <div className="hang-nut" style={{ justifyContent: "space-between", marginBottom: 6 }}>
             <h2 style={{ margin: 0 }}>Thư mục & ảnh</h2>
-            <form action={taoThuMucHanhDong} className="hang-nut" style={{ gap: 6 }}>
+            {laAdmin && <form action={taoThuMucHanhDong} className="hang-nut" style={{ gap: 6 }}>
               <input type="hidden" name="id" value={suKienId} />
               <input className="o-nhap" name="ten" placeholder="Thư mục mới (vd Buổi sáng)" style={{ width: 200, padding: "7px 12px", fontSize: 13.5 }} />
               <button className="nut nut-phu nut-nho" type="submit">＋ Tạo</button>
-            </form>
+            </form>}
           </div>
           {dsThuMuc.thuMucs.length > 0 && (
             <div className="day-chip" style={{ marginTop: 0 }}>
               {dsThuMuc.thuMucs.map((t) => (
                 <span key={t.id} className="chip" style={{ cursor: "default" }}>
                   {t.ten} <span className="dem">{t.soAnh}</span>
-                  <form action={xoaThuMucHanhDong} style={{ display: "inline", marginLeft: 2 }}>
+                  {laAdmin && <form action={xoaThuMucHanhDong} style={{ display: "inline", marginLeft: 2 }}>
                     <input type="hidden" name="id" value={suKienId} />
                     <input type="hidden" name="thu_muc_id" value={t.id} />
                     <NutXacNhan lop="bo-chip" hoi={`Xóa thư mục "${t.ten}"? Ảnh bên trong KHÔNG mất — chỉ về "chưa phân".`}>✕</NutXacNhan>
-                  </form>
+                  </form>}
                 </span>
               ))}
             </div>
           )}
-          <QuanLyAnh ma={suKien.ma} suKienId={suKienId} thuMucs={dsThuMuc.thuMucs} chuaPhan={dsThuMuc.chuaPhan} />
+          {laAdmin ? (
+            <QuanLyAnh ma={suKien.ma} suKienId={suKienId} thuMucs={dsThuMuc.thuMucs} chuaPhan={dsThuMuc.chuaPhan} />
+          ) : (
+            <p className="mo-ta" style={{ margin: "8px 0 0" }}>
+              Xem ảnh tại <a href={`/s/${suKien.ma}/thu-vien`} target="_blank" rel="noreferrer">trang thư viện</a>
+              {suKien.choPhepXemTatCa ? "." : " (đang đóng với học viên, chỉ Admin quản lý ảnh)."}
+            </p>
+          )}
         </div>
         </div>
       </div>

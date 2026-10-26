@@ -9,3 +9,25 @@ node_modules/
 __pycache__/
 # Kho ảnh + dữ liệu suy diễn (thumbnail, chuyển đổi…)
 du-lieu/
+
+# Bi mat / nhi phan - KHONG commit
+TUNNEL-TOKEN.txt
+URL-PUBLIC.txt
+quick-tunnel-log.txt
+QUICK-URL-NOW.txt
+a8261a73-*.json
+cloudflared.exe
+cert.pem
+test_write.tmp
+BAT-TUNNEL-TOKEN.bat
+CHAY-TUNNEL-TOKEN.vbs
+CHI-MUC-ANH*
+"Claude outputs/"
+logs/
+
+# Them truoc khi chuyen Mac: file bi mat cu
+*.cu
+.env.bak*
+apps/*/.env.bak*
+SETUP.ps1
+Claude outputs/

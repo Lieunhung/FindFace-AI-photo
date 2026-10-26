@@ -1,0 +1,4 @@
+tunnel: a8261a73-a055-40bb-b42d-3a3a760bef20
+credentials-file: D:\sc3\FindFace-AI\a8261a73-a055-40bb-b42d-3a3a760bef20.json
+ingress:
+  - service: http://localhost:3002

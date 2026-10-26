@@ -39,7 +39,7 @@ export async function POST(req: NextRequest) {
   const vectors: number[][] = [];
   try {
     for (const s of selfies) {
-      const mat = chonMatChinh(await layVectorAnh(s, s.name));
+      const mat = chonMatChinh(await layVectorAnh(s, s.name, { selfie: true }));
       if (mat) vectors.push(mat.vector);
     }
   } catch {

@@ -1,5 +1,5 @@
 // Ảnh khóa học — schema CSDL (tách từ dự án gốc 18/08/2026)
-// Quy ước: tên miền nghiệp vụ tiếng Việt không dấu; vector khuôn mặt = pgvector.
+// Quy ước: tên miền nghiệp vụ tiếng Việt không dấu; vector khuôn mặt = float8[] (không dùng pgvector).
 
 generator client {
   provider = "prisma-client-js"
@@ -53,7 +53,7 @@ model AnhSuKien {
   doSang    Float? // độ sáng trung bình 0..255
   canhBaoChatLuong Boolean @default(false) // mờ/tối/cháy — admin duyệt loại trước khi công bố
   dHash     String? // perceptual hash 16 hex — gom ảnh chụp liên thanh gần trùng
-  clipEmb   Unsupported("vector(512)")? // CLIP ViT-B/32 — tìm theo mô tả (bật qua env CLIP=1)
+  clipEmb   Unsupported("float8[]")? // CLIP ViT-B/32 — tìm theo mô tả (bật qua env CLIP=1)
   trangThai String    @default("cho_chi_muc") // cho_chi_muc | dang_chi_muc | xong | loi
   loi       String?
   taoLuc    DateTime  @default(now())
@@ -81,13 +81,13 @@ model ThuMucAnh {
 }
 
 model KhuonMat {
-  id           Int                          @id @default(autoincrement())
+  id           Int                    @id @default(autoincrement())
   anhId        Int
-  anh          AnhSuKien                    @relation(fields: [anhId], references: [id], onDelete: Cascade)
+  anh          AnhSuKien              @relation(fields: [anhId], references: [id], onDelete: Cascade)
   suKienId     Int // lặp từ AnhSuKien — lọc theo sự kiện ngay trong câu tìm vector, khỏi JOIN
   bbox         Json // [x1, y1, x2, y2] pixel trên ảnh gốc (đã xoay EXIF)
   diemPhatHien Float
-  embedding    Unsupported("vector(512)")? // ArcFace 512 chiều chuẩn hóa L2 — ghi/đọc qua $queryRaw
+  embedding    Unsupported("float8[]")? // ArcFace 512 chiều chuẩn hóa L2 — ghi/đọc qua $queryRaw
   cumId        Int? // cụm "một người" do job gom-cum gán
   cum          CumKhuonMat? @relation(fields: [cumId], references: [id], onDelete: SetNull)
 
@@ -101,7 +101,7 @@ model AlbumCaNhan {
   token      String    @unique
   suKienId   Int
   suKien     SuKienAnh @relation(fields: [suKienId], references: [id], onDelete: Cascade)
-  emb        Unsupported("vector(512)")?
+  emb        Unsupported("float8[]")?
   lienHe     String? // email nhận báo "có ảnh mới"
   soAnh      Int       @default(0)
   taoLuc     DateTime  @default(now())
