@@ -38,3 +38,10 @@ Claude outputs/
 apps/*/.env.bak*
 SETUP.ps1
 Claude outputs/
+
+# Them truoc khi chuyen Mac: file bi mat cu
+*.cu
+.env.bak*
+apps/*/.env.bak*
+SETUP.ps1
+Claude outputs/
